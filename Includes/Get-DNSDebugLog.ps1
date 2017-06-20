@@ -46,56 +46,73 @@ Blog Entry: http://virot.eu/wordpress/easy-handling-before-removing-dns/
 Author:	Oscar Virot - virot@virot.com
 Filename: Get-DNSDebugLog.ps1
 #>
-	[CmdletBinding()]
-	Param(
-		[Parameter(Mandatory=$true)]
-		[string]
-		[ValidateScript({Test-Path($_)})]
-		$Path,
-		[Parameter(Mandatory=$False)]
-		[string[]]
-		$Ignore,
-                [System.Globalization.CultureInfo]
-		$Culture = [System.Globalization.CultureInfo]::CurrentCulture
-	)
-	Begin
+  [CmdletBinding()]
+  Param(
+    [Parameter(Mandatory=$true)]
+    [string]
+    [ValidateScript({Test-Path($_)})]
+    $Path,
+    [Parameter(Mandatory=$False)]
+    [string[]]
+    $Ignore,
+    [System.Globalization.CultureInfo]
+    $Culture = [System.Globalization.CultureInfo]::CurrentCulture
+  )
+  Begin
+  {
+    $Regex_Group_Date=1
+    $Regex_Group_IP=9
+		$Regex_Group_Way=8
+		$Regex_Group_QR=11
+		$Regex_Group_OpCode=12
+		$Regex_Group_QueryType=13
+		$Regex_Group_Query=14
+    Write-Verbose "Storing DNS logfile format"
+    $dnspattern = "^(?<date>([0-9]{1,2}(\/|\.)[0-9]{2}(\/|\.)[0-9]{2,4}|[0-9]{2,4}-[0-9]{2}-[0-9]{2})\s*[0-9: ]{7,8}\s*(PM|AM)?) ([0-9A-Z]{3,4} PACKET\s*[0-9A-Za-z]{8,16}) (UDP|TCP) (?<way>Snd|Rcv) (?<ip>[0-9.]{7,15}|[0-9a-f:]{3,50})\s*([0-9a-z]{4}) (?<QR>.) (?<OpCode>.) \[.*\] (?<QueryType>.*) (?<query>\(.*)"
+    Write-Verbose "Storing storing returning customobject format"
+    $returnselect = @{label="Client IP";expression={[ipaddress] ($match.Groups['ip'].value.trim()).trim()}},
+      @{label="DateTime";expression={$dt = [datetime]::new(1);[datetime]::TryParse($match.Groups['date'].value.trim(),$Culture.DateTimeFormat,[System.Globalization.DateTimeStyles]::None,[ref]$dt)|Out-Null;$dt}},
+      @{label="QR";expression={switch($match.Groups['QR'].value.trim()){" " {'Query'};"R" {'Response'}}}},
+      @{label="OpCode";expression={switch($match.Groups['OpCode'].value.trim()){'Q' {'Standard Query'};'N' {'Notify'};'U' {'Update'};'?' {'Unknown'}}}},
+      @{label="Way";expression={$match.Groups['way'].value.trim()}},
+      @{label="QueryType";expression={$match.Groups['QueryType'].value.trim()}},
+      @{label="Query";expression={$match.Groups['query'].value.trim() -replace "(`\(.*)","`$1" -replace "`\(.*?`\)","." -replace "^.",""}}
+    if ($Culture -ne [System.Globalization.CultureInfo]::CurrentCulture)
+    {
+      Write-Verbose "Using custom Culture: $Culture"
+    }
+  }
+  Process
+  {
+    Write-Verbose "Getting the contents of $Path, and matching for correct rows."
+    $rows = ([array](Get-Content $Path)) -notmatch 'ERROR offset' -notmatch 'NOTIMP'
+    Write-Verbose "Found $($rows.count) in debuglog, processing 1 at a time."
+    ForEach ($row in $rows)
+    {
+      write-verbose "Row: $($row)"
+      $match = [regex]::match($row,$dnspattern)
+      if ($match.success )
+      {
+        Try
 	{
-		Write-Verbose "Storing DNS logfile format"
-		$dnspattern = "^([0-9]{1,2}\/[0-9]{2}\/[0-9]{2,4}|[0-9]{2,4}-[0-9]{2}-[0-9]{2}) ([0-9: ]{7,8}\s?P?A?M?) ([0-9A-Z]{3,4} PACKET\s*[0-9A-Za-z]{8,16}) (UDP|TCP) (Snd|Rcv) ([0-9 .]{7,15})\s*([0-9a-z]{4}) (.) (.) \[.*\] (.*) (\(.*)"
-		Write-Verbose "Storing storing returning customobject format"
-		$returnselect = @{label="Client IP";expression={[ipaddress] ($temp[6]).trim()}},
-			@{label="DateTime";expression={[DateTime] (Get-Date("$($temp[1]) $($temp[2])"))}},
-			@{label="QR";expression={switch($temp[8]){" " {'Query'};"R" {'Response'}}}},
-			@{label="OpCode";expression={switch($temp[9]){'Q' {'Standard Query'};'N' {'Notify'};'U' {'Update'};'?' {'Unknown'}}}},
-			@{label="Way";expression={$temp[5]}},
-			@{label="QueryType";expression={($temp[10]).Trim()}},
-			@{label="Query";expression={$temp[11] -replace "(`\(.*)","`$1" -replace "`\(.*?`\)","." -replace "^.",""}}
-	}
-	Process
-	{
-		Write-Verbose "Getting the contents of $Path, and matching for correct rows."
-		$rows = (Get-Content $Path) -match $dnspattern -notmatch 'ERROR offset' -notmatch 'NOTIMP'
-		Write-Verbose "Found $($rows.count) in debuglog, processing 1 at a time."
-		ForEach ($row in $rows)
-		{
-			Try
-			{
-				$temp = $Null
-				$temp = [regex]::split($row,$dnspattern)
-				if ($Ignore -notcontains ([ipaddress] ($temp[6]).trim()))
-				{
-					$true | Select-Object $returnselect
-				}
-			}
-			Catch
-			{
-				Write-Verbose 'Failed to interpet row.'
-				Write-Debug 'Failed to interpet row.'
-				Write-Debug $row
-			}
-		}
-	}
-	End
-	{
-	}
+          if ($Ignore -notcontains ([ipaddress] $match.Groups['ip'].value.trim()))
+          {
+            $true | Select-Object $returnselect
+          }
+        }
+        Catch
+        {
+          Write-Debug 'Failed to interpet row.'
+          Write-Debug $row
+        }
+      }
+      else
+      {
+        Write-Verbose 'Row does not match DNS Pattern'
+      }
+    }
+  }
+  End
+  {
+  }
 }
