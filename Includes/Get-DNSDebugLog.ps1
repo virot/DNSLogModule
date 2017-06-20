@@ -12,6 +12,9 @@ Specifies the path to the DNS debug logfile.
 .PARAMETER Ignore
 Specifies which IPs to ignore.
 
+.PARAMETER Culture
+If other culture was used on server specify this here
+
 .INPUTS
 Takes the filepath of the DNS servers debug log.
 And an Ignore parameter to ignore certain ips.
@@ -60,15 +63,8 @@ Filename: Get-DNSDebugLog.ps1
   )
   Begin
   {
-    $Regex_Group_Date=1
-    $Regex_Group_IP=9
-		$Regex_Group_Way=8
-		$Regex_Group_QR=11
-		$Regex_Group_OpCode=12
-		$Regex_Group_QueryType=13
-		$Regex_Group_Query=14
     Write-Verbose "Storing DNS logfile format"
-    $dnspattern = "^(?<date>([0-9]{1,2}(\/|\.)[0-9]{2}(\/|\.)[0-9]{2,4}|[0-9]{2,4}-[0-9]{2}-[0-9]{2})\s*[0-9: ]{7,8}\s*(PM|AM)?) ([0-9A-Z]{3,4} PACKET\s*[0-9A-Za-z]{8,16}) (UDP|TCP) (?<way>Snd|Rcv) (?<ip>[0-9.]{7,15}|[0-9a-f:]{3,50})\s*([0-9a-z]{4}) (?<QR>.) (?<OpCode>.) \[.*\] (?<QueryType>.*) (?<query>\(.*)"
+    $dnspattern = "^(?<date>([0-9]{1,2}.[0-9]{1,2}.[0-9]{2,4}|[0-9]{2,4}-[0-9]{2}-[0-9]{2})\s*[0-9: ]{7,8}\s*(PM|AM)?) ([0-9A-Z]{3,4} PACKET\s*[0-9A-Za-z]{8,16}) (UDP|TCP) (?<way>Snd|Rcv) (?<ip>[0-9.]{7,15}|[0-9a-f:]{3,50})\s*([0-9a-z]{4}) (?<QR>.) (?<OpCode>.) \[.*\] (?<QueryType>.*) (?<query>\(.*)"
     Write-Verbose "Storing storing returning customobject format"
     $returnselect = @{label="Client IP";expression={[ipaddress] ($match.Groups['ip'].value.trim()).trim()}},
       @{label="DateTime";expression={$dt = [datetime]::new(1);[datetime]::TryParse($match.Groups['date'].value.trim(),$Culture.DateTimeFormat,[System.Globalization.DateTimeStyles]::None,[ref]$dt)|Out-Null;$dt}},
