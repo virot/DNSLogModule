@@ -19,9 +19,7 @@ Describe "Localization" {
     It "Verify date on sv-SE log" {
       Get-DNSDebugLog -Culture 'sv-SE' -Path "$Pesterpath\Example-Data\dns-Locale-sv-SE-Windows2012r2.txt"|Select -First 1 |%{Get-Date $_.Datetime -Format 'yyyy-MM-dd HH:mm:ss'} |Should be "2017-05-21 19:46:11"
     }
-
+    It "Verify date on de-DE log" {
+      Get-DNSDebugLog -Culture 'de-DE' -Path "$Pesterpath\Example-Data\dns-Locale-de-DE-WindowsUnknown.txt" |Select -First 1 |%{Get-Date $_.Datetime -Format 'yyyy-MM-dd HH:mm:ss'} |Should be "2020-03-06 17:15:40"
+    }
 }
-
-
-
-"C:\GIT\DNSLogmodule\Pester\Example-Data\dns-Locale-sv-SE-Windows2012r2.txt"
